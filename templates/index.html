@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Decision Completeness Engine (DCE)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/css/custom.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#1e1b4b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500/30">
+
+  <!-- Top App Navigation -->
+  <header class="border-b border-slate-800/80 bg-[#0f172a]/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand & Tagline -->
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-white/20">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-lg tracking-tight text-white">Decision Completeness Engine</h1>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">DCE v1.0</span>
+          </div>
+          <p class="text-xs text-slate-400">Verifies complete evidence <em>before</em> deciding • Self-heals gaps autonomously</p>
+        </div>
+      </div>
+
+      <!-- Quick Actions / Live Engine Indicator -->
+      <div class="flex items-center gap-3">
+        <!-- Speed Selector -->
+        <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-300 shadow-inner">
+          <span class="text-slate-400 text-[11px] uppercase tracking-wider font-semibold">Speed:</span>
+          <select id="speed-mode-select" class="bg-transparent text-indigo-300 font-bold focus:outline-none cursor-pointer text-xs">
+            <option value="turbo" selected class="bg-slate-900 text-white">⚡ Turbo (Instant)</option>
+            <option value="fast" class="bg-slate-900 text-white">🏎️ Fast (Animated)</option>
+            <option value="walkthrough" class="bg-slate-900 text-white">🚶 Step-by-Step</option>
+          </select>
+        </div>
+
+        <!-- Auto-HITL Option -->
+        <label class="hidden sm:flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none bg-slate-900/60 border border-slate-800 px-2.5 py-1.5 rounded-xl hover:border-slate-700 transition" title="Automatically approves human micro-request if triggered">
+          <input type="checkbox" id="auto-hitl-check" class="rounded border-slate-700 bg-slate-800 text-indigo-500 focus:ring-0">
+          <span class="text-[11px] font-medium text-slate-300">Auto-Approve HITL</span>
+        </label>
+
+        <button id="btn-run-full" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 shadow-lg shadow-indigo-600/25 transition active:scale-95">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Run Pipeline</span>
+        </button>
+
+        <button id="btn-step-next" class="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition">
+          <span>Step</span>
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        <a href="/static/HackSprint_Decision_Completeness_Engine.pptx" download class="hidden lg:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition shadow-sm" title="Download the MAHE HackSprint 24-Hour Presentation Deck">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>Download PPTX</span>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Scenario Selector Toolbar -->
+  <section class="border-b border-slate-800/60 bg-[#0e1424] py-3">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Select Scenario:</span>
+        <div id="scenario-selector-container" class="flex flex-wrap items-center gap-1.5">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-custom-modal" class="px-2.5 py-1 text-xs rounded-lg font-medium text-indigo-300 bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-700/40 transition">
+          + Custom Request
+        </button>
+        <button id="btn-reset" class="px-2.5 py-1 text-xs rounded-lg font-medium text-slate-400 hover:text-slate-200 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 transition">
+          Reset
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8-Step Interactive Visual Stepper -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 w-full">
+    <div class="bg-[#0f172a]/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
+      <div class="flex items-center justify-between text-xs text-slate-400 mb-3 px-1">
+        <span class="font-bold uppercase tracking-wider text-slate-300">The 8-Step Decision Completeness Lifecycle</span>
+        <span id="pipeline-status-text" class="font-mono text-indigo-400">Ready to execute</span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        
+        <!-- Step 1 -->
+        <div id="step-node-1" class="step-card active flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">01</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Intake</span>
+          <span class="text-[11px] text-slate-400">Request & Dossier</span>
+        </div>
+
+        <!-- Step 2 -->
+        <div id="step-node-2" class="step-card flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">02</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Evidence Plan</span>
+          <span class="text-[11px] text-slate-400">Inferred Specs</span>
+        </div>
+
+        <!-- Step 3 -->
+        <div id="step-node-3" class="step-card flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">03</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Gap Audit</span>
+          <span class="text-[11px] text-slate-400">Completeness %</span>
+        </div>
+
+        <!-- Step 4 -->
+        <div id="step-node-4" class="step-card flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">04</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Gatekeeper</span>
+          <span class="text-[11px] text-slate-400">Block Verdict</span>
+        </div>
+
+        <!-- Step 5 -->
+        <div id="step-node-5" class="step-card flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">05</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Self-Healing</span>
+          <span class="text-[11px] text-slate-400">Drive/Email/ERP</span>
+        </div>
+
+        <!-- Step 6 -->
+        <div id="step-node-6" class="step-card flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">06</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Precision HITL</span>
+          <span class="text-[11px] text-slate-400">Target Micro-Ask</span>
+        </div>
+
+        <!-- Step 7 -->
+        <div id="step-node-7" class="step-card flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">07</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Verdict & Act</span>
+          <span class="text-[11px] text-slate-400">Explainable Decision</span>
+        </div>
+
+        <!-- Step 8 -->
+        <div id="step-node-8" class="step-card flex flex-col p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="step-num text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">08</span>
+            <span class="step-status-icon text-slate-500">⚪</span>
+          </div>
+          <span class="text-xs font-semibold text-white">Meta-Learning</span>
+          <span class="text-[11px] text-slate-400">Process Optimizer</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Navigation Tabs -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+    <div class="flex border-b border-slate-800 gap-1">
+      <button class="nav-tab active px-4 py-2.5 text-sm font-semibold border-b-2 border-indigo-500 text-white flex items-center gap-2" data-tab="tab-decision-room">
+        <span>⚡ Live Decision Console</span>
+      </button>
+      <button class="nav-tab px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2" data-tab="tab-hitl-card">
+        <span>🎯 Precision HITL Modal</span>
+        <span id="hitl-tab-badge" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">Action Needed</span>
+      </button>
+      <button class="nav-tab px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2" data-tab="tab-sources">
+        <span>🗄️ Connected Knowledge Vault</span>
+      </button>
+      <button class="nav-tab px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2" data-tab="tab-analytics">
+        <span>📈 Meta-Learning & Process Mining</span>
+      </button>
+      <button class="nav-tab px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2" data-tab="tab-n8n">
+        <span>🧩 n8n Architecture & Prompts</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Main Viewports -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
+    
+    <!-- Tab 1: Live Decision Console -->
+    <div id="tab-decision-room" class="tab-pane block space-y-6">
+      
+      <!-- Top Row: Request Banner + Gatekeeper Notification -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Request Dossier Card -->
+        <div class="lg:col-span-2 bg-[#0f172a] border border-slate-800 rounded-2xl p-5 shadow-lg">
+          <div class="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <span id="req-domain-badge" class="px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+                Procurement
+              </span>
+              <h2 id="req-title" class="text-lg font-bold text-white mt-2">Loading decision request...</h2>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-400">Request ID:</span>
+              <div id="req-id" class="font-mono text-xs font-semibold text-slate-200">--</div>
+            </div>
+          </div>
+
+          <p id="req-summary" class="text-sm text-slate-300 mb-4 leading-relaxed">--</p>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-800/80 text-xs">
+            <div>
+              <span class="text-slate-400 block text-[11px]">Requester</span>
+              <strong id="req-requester" class="text-slate-200">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[11px]">Department</span>
+              <strong id="req-dept" class="text-slate-200">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[11px]">Amount / Value</span>
+              <strong id="req-amount" class="text-emerald-400 font-mono text-sm">--</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completeness Gauge & Gatekeeper Block Card -->
+        <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Completeness Score</span>
+              <span id="completeness-score-badge" class="font-mono font-bold text-lg text-amber-400">0%</span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden mb-3">
+              <div id="completeness-progress-bar" class="h-3 rounded-full bg-gradient-to-r from-amber-500 to-indigo-500 transition-all duration-500" style="width: 0%"></div>
+            </div>
+
+            <div id="gatekeeper-status-box" class="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+              <div class="flex items-center gap-2 font-semibold text-slate-200 mb-1">
+                <span id="gate-icon">🛡️</span>
+                <span id="gate-title">Gatekeeper Inactive</span>
+              </div>
+              <p id="gate-desc" class="text-slate-400 leading-snug">Run the pipeline to initiate dynamic evidence specification and gap auditing.</p>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Verified: <strong id="metric-verified" class="text-slate-200">0</strong></span>
+            <span>Self-Healed: <strong id="metric-healed" class="text-cyan-400">0</strong></span>
+            <span>Missing: <strong id="metric-missing" class="text-rose-400">0</strong></span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Middle: Dynamic Evidence Specification & Verification Table -->
+      <div class="bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+        <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h3 class="font-bold text-white text-base">Dynamic Evidence Specification & Verification</h3>
+            <span class="px-2 py-0.5 rounded text-[11px] bg-slate-800 text-slate-300">Inferred by AI, not hardcoded</span>
+          </div>
+          <div class="text-xs text-slate-400">
+            Real-time status across Initial Dossier, Sources & HITL
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300 border-collapse">
+            <thead class="bg-slate-900/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-3 px-4">Evidence Requirement</th>
+                <th class="py-3 px-3">Category</th>
+                <th class="py-3 px-3">Importance</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-4">Discovered Source & Citation</th>
+                <th class="py-3 px-3">Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="evidence-table-body" class="divide-y divide-slate-800/60 font-sans">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500">
+                  Click <strong>Run Pipeline</strong> or <strong>Step Through</strong> to formulate evidence requirements.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bottom: Final Verdict & Action Execution Card (Revealed after deliberation) -->
+      <div id="verdict-container" class="hidden bg-[#0f172a] border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Deliberated Outcome (Step 7)</span>
+            <div class="flex items-center gap-3 mt-1">
+              <span id="verdict-badge" class="px-3.5 py-1.5 rounded-xl font-bold text-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                APPROVED
+              </span>
+              <h3 id="verdict-title" class="text-lg font-bold text-white">Full Approval Verified</h3>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4 text-xs">
+            <div class="bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
+              <span class="text-slate-400 block text-[11px]">Calibrated Confidence</span>
+              <strong id="verdict-confidence" class="text-base text-emerald-400 font-mono">97%</strong>
+            </div>
+            <div class="bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
+              <span class="text-slate-400 block text-[11px]">Decision ID</span>
+              <span id="verdict-id" class="text-slate-200 font-mono">DEC-8819</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-5">
+          
+          <!-- Recommendation & Reasoning Chain -->
+          <div class="lg:col-span-2 space-y-4">
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Executive Rationale</h4>
+              <p id="verdict-summary" class="text-sm text-slate-200 leading-relaxed bg-slate-900/60 p-3.5 rounded-xl border border-slate-800/80">
+                --
+              </p>
+            </div>
+
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Auditable Reasoning Chain</h4>
+              <ul id="verdict-reasoning-list" class="space-y-1.5 text-xs text-slate-300">
+                <!-- Injected via JS -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- Dispatched Automated Actions -->
+          <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
+                <span>Automated Actions Executed</span>
+                <span class="text-emerald-400 text-[11px]">Live Dispatch</span>
+              </h4>
+              <div id="actions-list" class="space-y-2 text-xs">
+                <!-- Actions injected via JS -->
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+              <span>Cryptographic Audit Proof</span>
+              <span class="font-mono text-indigo-400">SHA256: 7f8c...3b9e</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tab 2: Precision HITL Modal / Simulator -->
+    <div id="tab-hitl-card" class="tab-pane hidden max-w-3xl mx-auto space-y-6">
+      
+      <div class="bg-[#0f172a] border border-amber-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+        <div class="absolute -right-12 -top-12 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Precision Human-in-the-Loop Interceptor</h3>
+              <p class="text-xs text-slate-400">Simulating real-time Slack / Teams / Email Executive Push</p>
+            </div>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+            Targeted Micro-Ask
+          </span>
+        </div>
+
+        <div class="py-5 space-y-4">
+          <!-- Notification Persona -->
+          <div class="flex items-center justify-between text-xs bg-slate-900 p-3 rounded-xl border border-slate-800">
+            <div>
+              <span class="text-slate-400 block text-[11px]">Target Reviewer</span>
+              <strong id="hitl-target-role" class="text-slate-200">Sarah Jenkins (VP Finance)</strong>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-400 block text-[11px]">Direct Notification Channel</span>
+              <span id="hitl-target-email" class="font-mono text-indigo-400">Slack: #vp-finance-approvals</span>
+            </div>
+          </div>
+
+          <!-- Pre-Verified Context (The 30-second context) -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-xs">
+            <span class="text-emerald-400 font-bold block mb-1">✓ Automated Checks Already Completed by AI:</span>
+            <p id="hitl-verified-summary" class="text-slate-300 leading-relaxed font-mono text-[11px]">
+              Pricing benchmark verified (8.2% cost advantage); SOC2 Type II cert recovered from Drive; past fulfillment SLA verified at 98.4%.
+            </p>
+          </div>
+
+          <!-- The Single Delta -->
+          <div class="bg-amber-950/20 border border-amber-500/40 p-4 rounded-xl">
+            <div class="flex items-center gap-2 mb-1.5 text-amber-300 text-xs font-bold uppercase tracking-wider">
+              <span>⚠️ Exactly ONE Missing Item Required From You:</span>
+            </div>
+            <h4 id="hitl-missing-item" class="text-base font-bold text-white mb-1">
+              Departmental Budget Sign-off (VP / Finance Head)
+            </h4>
+            <p id="hitl-action-required" class="text-xs text-slate-300 leading-relaxed">
+              Expenditure of $85,000 exceeds standard delegation threshold of $50,000. Corporate policy requires VP Finance signoff from Cost Center CC-4010.
+            </p>
+          </div>
+
+          <!-- Human Action Inputs -->
+          <div class="space-y-3 pt-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Reviewer Note / Verification Memo (Optional):</label>
+              <input type="text" id="hitl-notes-input" placeholder="e.g. Authorized from unencumbered Q4 hardware allocation." value="Authorized from unencumbered Q4 hardware allocation." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button id="btn-hitl-approve" class="flex-1 px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                <span>✓ Grant One-Click Approval</span>
+              </button>
+              <button id="btn-hitl-upload" class="px-4 py-2.5 rounded-xl font-medium text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+                <span>📎 Upload Signed Memo</span>
+              </button>
+              <button id="btn-hitl-reject" class="px-4 py-2.5 rounded-xl font-bold text-xs text-rose-300 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/40 transition">
+                <span>✕ Deny / Reject</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Tab 3: Knowledge Vault & Connectors -->
+    <div id="tab-sources" class="tab-pane hidden space-y-6">
+      <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+          <div>
+            <h3 class="text-base font-bold text-white">Autonomous Knowledge Vault</h3>
+            <p class="text-xs text-slate-400">Enterprise data sources connected to the DCE autonomous retriever.</p>
+          </div>
+          <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 font-mono">4 Connectors Active</span>
+        </div>
+
+        <div id="sources-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Meta-Learning & Process Mining (Step 8) -->
+    <div id="tab-analytics" class="tab-pane hidden space-y-6">
+      
+      <!-- Metrics Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-4 shadow-lg">
+          <span class="text-slate-400 text-xs">Total Decisions Audited</span>
+          <div id="metric-total-runs" class="text-2xl font-bold text-white font-mono mt-1">--</div>
+          <span class="text-[11px] text-slate-400 mt-1 block">Cross-enterprise runs</span>
+        </div>
+
+        <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-4 shadow-lg">
+          <span class="text-slate-400 text-xs">Gatekeeper Block Rate</span>
+          <div id="metric-block-rate" class="text-2xl font-bold text-amber-400 font-mono mt-1">--</div>
+          <span class="text-[11px] text-slate-400 mt-1 block">Stopped before hallucinating</span>
+        </div>
+
+        <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-4 shadow-lg">
+          <span class="text-slate-400 text-xs">Autonomous Self-Heal Rate</span>
+          <div id="metric-heal-rate" class="text-2xl font-bold text-cyan-400 font-mono mt-1">--</div>
+          <span class="text-[11px] text-slate-400 mt-1 block">Recovered with zero human effort</span>
+        </div>
+
+        <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-4 shadow-lg">
+          <span class="text-slate-400 text-xs">Estimated Hours Saved</span>
+          <div id="metric-hours-saved" class="text-2xl font-bold text-emerald-400 font-mono mt-1">--</div>
+          <span class="text-[11px] text-slate-400 mt-1 block">Chasing missing documents</span>
+        </div>
+
+      </div>
+
+      <!-- Actionable Process Improvement Insights -->
+      <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+          <div>
+            <h3 class="text-base font-bold text-white">Systemic Bottlenecks & Process Re-engineering Proposals</h3>
+            <p class="text-xs text-slate-400">Step 8 Continuous Meta-Learning: Discovered patterns from execution telemetry</p>
+          </div>
+          <span class="px-2.5 py-1 text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-lg">
+            AI Process Mining
+          </span>
+        </div>
+
+        <div id="recommendations-container" class="space-y-4">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tab 5: n8n Architecture & Prompts -->
+    <div id="tab-n8n" class="tab-pane hidden space-y-6">
+      <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white">n8n Node-by-Node Production Architecture</h3>
+            <p class="text-xs text-slate-400">Deploy this exact engine directly into your enterprise n8n workspace.</p>
+          </div>
+          <button id="btn-download-n8n" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow transition">
+            Download n8n Workflow JSON
+          </button>
+        </div>
+
+        <!-- ASCII / Mermaid Flowchart -->
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 overflow-x-auto leading-relaxed mb-6">
+          <pre>
+┌──────────────────┐
+│  Webhook Trigger │ Intake Request (Form / Email / Jira / ERP)
+└────────┬─────────┘
+         │
+         ▼
+┌───────────────────────────┐
+│ AI Agent: Evidence Planner│ Inters dynamically: Price benchmark, SLA, SOC2, Budget Signoff
+└────────┬──────────────────┘
+         │
+         ▼
+┌───────────────────────────┐
+│  AI Agent: Gap Auditor    │ Audits initial dossier. Computes Completeness %
+└────────┬──────────────────┘
+         │
+    [Is Complete?] ──Yes─────────────────────────────────────────────────┐
+         │ No                                                            │
+         ▼                                                               │
+┌───────────────────────────┐                                            │
+│ Autonomous Search Loop    │ Queries Google Drive, Gmail, NetSuite, etc. │
+└────────┬──────────────────┘                                            │
+         │                                                               │
+    [All Found?] ──Yes───────────────────────────────────────────────────┤
+         │ No                                                            │
+         ▼                                                               │
+┌───────────────────────────┐                                            │
+│ Precision HITL Node       │ Sends Slack / Email interactive card       │
+│ (Targeted Micro-Ask)      │ "Sarah (VP Finance): Confirm $85k budget"   │
+└────────┬──────────────────┘                                            │
+         │ User Clicks "Approve"                                         │
+         ▼                                                               │
+┌────────────────────────────────────────────────────────────────────────┴──┐
+│ AI Deliberator & Synthesizer: Renders Verdict + Confidence + Audit Proof  │
+└────────────────────────────────────┬──────────────────────────────────────┘
+                                     │
+                                     ▼
+         ┌───────────────────────────┴────────────────────────────┐
+         │                                                        │
+         ▼                                                        ▼
+┌─────────────────────────────────┐           ┌───────────────────────────────────┐
+│ Action Dispatchers              │           │ Scheduled Telemetry & Optimizer   │
+│ - Issue Purchase Order          │           │ - Analyzes repetitive bottlenecks │
+│ - Slack Requester Alert         │           │ - Suggests intake form redesign   │
+│ - Cryptographic Ledger Commit   │           └───────────────────────────────────┘
+└─────────────────────────────────┘
+          </pre>
+        </div>
+
+        <!-- Prompt Library -->
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Core n8n AI Agent System Prompts</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+            <span class="text-indigo-400 font-bold block mb-2 font-sans">1. Evidence Planner Prompt</span>
+            <p class="text-slate-400 leading-snug">"You are an evidence planning engine. You receive a decision request and infer the minimum sufficient specification of required evidence items..."</p>
+          </div>
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+            <span class="text-amber-400 font-bold block mb-2 font-sans">2. Gatekeeper Auditor Prompt</span>
+            <p class="text-slate-400 leading-snug">"You are a strict compliance gatekeeper. You refuse to deliberate if any critical evidence is missing. Enforce zero-hallucination..."</p>
+          </div>
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+            <span class="text-emerald-400 font-bold block mb-2 font-sans">3. Deliberation Synthesizer</span>
+            <p class="text-slate-400 leading-snug">"You synthesize all verified pieces of evidence into a calibrated verdict with confidence score and structured downstream actions..."</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Custom Request Modal -->
+  <div id="custom-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="font-bold text-white text-base">New Custom Decision Request</h3>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Title / Proposal Name</label>
+          <input type="text" id="cust-title" value="Approve CyberGuard AI for Threat Detection Software" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Domain</label>
+            <select id="cust-domain" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+              <option value="procurement">Vendor / Procurement</option>
+              <option value="lending">Commercial Lending</option>
+              <option value="hiring">Executive Hiring</option>
+              <option value="healthcare">Healthcare Claims</option>
+              <option value="compliance">Security Exemption</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Estimated Amount ($)</label>
+            <input type="number" id="cust-amount" value="65000" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Requester Name</label>
+          <input type="text" id="cust-requester" value="Alex Rivera (Director of InfoSec)" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Summary / Context</label>
+          <textarea id="cust-summary" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">Seeking approval to onboard CyberGuard AI for endpoint monitoring. Software license commitment of $65k/year.</textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+        <button id="btn-cancel-modal" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 bg-slate-800">Cancel</button>
+        <button id="btn-submit-modal" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500">Ingest & Formulate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

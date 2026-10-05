@@ -1,0 +1,280 @@
+{
+  "name": "The Decision Completeness Engine (DCE)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "decision-intake",
+        "options": {}
+      },
+      "id": "node-webhook-intake",
+      "name": "Step 1: Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert Decision Governance AI. You receive a decision intake request and must dynamically infer the precise specification of evidence required before any decision can legitimately be rendered.\n\nRequest Context:\nTitle: {{ $json.body.title }}\nDomain: {{ $json.body.domain }}\nAmount: {{ $json.body.amount }}\nRequester: {{ $json.body.requester }}\nDepartment: {{ $json.body.department }}\nSummary: {{ $json.body.summary }}\n\nFormulate a structured JSON array of EvidenceRequirement objects. For each requirement include: id, name, description, category, importance (CRITICAL, MANDATORY, RECOMMENDED), query_hints, and validation_rule.\nDo NOT hardcode a static checklist; tailor requirements to the financial scale, compliance exposure, and operational risk of this specific request.",
+        "options": {
+          "systemMessage": "You are the Evidence Specification Planner in the Decision Completeness Engine. Output strictly valid JSON."
+        }
+      },
+      "id": "node-ai-planner",
+      "name": "Step 2: AI Evidence Planner",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 3 & 4: Audit initial dossier against inferred requirements\nconst requestData = $('Step 1: Intake Webhook').first().json.body;\nconst requirements = JSON.parse($input.first().json.output || '[]');\nconst initialAttachments = requestData.initial_documents || [];\n\nconst items = [];\nlet verifiedCount = 0;\nlet criticalMissingCount = 0;\n\nrequirements.forEach(req => {\n  const found = initialAttachments.some(doc => \n    doc.name.toLowerCase().includes(req.id.toLowerCase().replace(/_/g, ' ')) ||\n    req.query_hints.some(hint => doc.name.toLowerCase().includes(hint.toLowerCase()))\n  );\n\n  if (found) {\n    verifiedCount++;\n    items.push({\n      requirement_id: req.id,\n      name: req.name,\n      status: 'VERIFIED',\n      source: 'INITIAL_ATTACHMENT'\n    });\n  } else {\n    items.push({\n      requirement_id: req.id,\n      name: req.name,\n      status: 'MISSING',\n      importance: req.importance,\n      query_hints: req.query_hints\n    });\n    if (req.importance === 'CRITICAL' || req.importance === 'MANDATORY') {\n      criticalMissingCount++;\n    }\n  }\n});\n\nconst isComplete = (criticalMissingCount === 0);\nconst completenessScore = Math.round((verifiedCount / requirements.length) * 100);\n\nreturn [{\n  json: {\n    isComplete,\n    completenessScore,\n    requirementsCount: requirements.length,\n    verifiedCount,\n    criticalMissingCount,\n    auditItems: items,\n    missingRequirements: items.filter(i => i.status === 'MISSING')\n  }\n}];"
+      },
+      "id": "node-code-auditor",
+      "name": "Step 3 & 4: Gap Auditor & Gatekeeper",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isComplete }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node-if-complete",
+      "name": "Decision Gate: Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Investigate missing evidence for decision: {{ $('Step 1: Intake Webhook').first().json.body.title }}.\n\nMissing Requirements to Find:\n{{ JSON.stringify($json.missingRequirements) }}\n\nUse connected search tools (Google Drive, Gmail, NetSuite ERP, Corporate Registry) to locate supporting files or records. For each item found, extract citation, summary, and confidence score.",
+        "options": {
+          "systemMessage": "You are the Autonomous Multi-Source Retriever. Query external repositories to self-heal evidence gaps."
+        }
+      },
+      "id": "node-ai-retriever",
+      "name": "Step 5: Autonomous Retriever Loop",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1180, 480]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.remainingMissingCount || 0 }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "node-if-all-healed",
+      "name": "All Healed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1400, 480]
+    },
+    {
+      "parameters": {
+        "channel": "#executive-approvals",
+        "text": "=🎯 *DECISION COMPLETENESS ENGINE: Precision Human Action Required*\n\nRequest: *{{ $('Step 1: Intake Webhook').first().json.body.title }}*\nRequester: {{ $('Step 1: Intake Webhook').first().json.body.requester }}\n\n✓ *Verified by AI*: All operational & security checks passed.\n⚠️ *Missing ONLY*: {{ $json.missingItemName }}\n\nPlease click to approve or decline this specific item:",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "id": "node-slack-hitl",
+      "name": "Step 6: Precision HITL Micro-Ask",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1640, 560]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are the Decision Deliberation Synthesizer. All required evidence has been gathered and verified.\n\nDecision Dossier:\n{{ JSON.stringify($json) }}\n\nSynthesize the complete dossier and output a JSON decision object containing:\n1. verdict (APPROVED, REJECTED)\n2. confidence_score (0.0 to 1.0)\n3. executive_summary\n4. reasoning_chain (list of auditable assertions citing evidence)\n5. risk_assessment (overall_risk, mitigations)\n6. actions_to_execute (e.g. issue PO, notify requester, log audit ledger)",
+        "options": {
+          "systemMessage": "Render an auditable, explainable decision based strictly on verified evidence."
+        }
+      },
+      "id": "node-ai-deliberator",
+      "name": "Step 7: AI Deliberator & Verdict",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1900, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.internal-erp.com/v1/purchase-orders",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"decisionId\": \"{{ $json.output.decision_id }}\",\n  \"verdict\": \"{{ $json.output.verdict }}\",\n  \"confidence\": {{ $json.output.confidence_score }},\n  \"requestId\": \"{{ $('Step 1: Intake Webhook').first().json.body.id }}\",\n  \"auditHash\": \"{{ $execution.id }}\"\n}",
+        "options": {}
+      },
+      "id": "node-http-action",
+      "name": "Step 7b: Execute Actions (ERP/PO)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2140, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "intervalValue": 1
+            }
+          ]
+        }
+      },
+      "id": "node-cron-analytics",
+      "name": "Step 8: Weekly Process Optimizer Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 720]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Analyze the past 100 decision execution logs from the audit ledger database. Identify recurring evidence bottlenecks where decisions were blocked at Step 4. Formulate 3 concrete business process improvement recommendations to re-engineer intake forms and eliminate delays.",
+        "options": {
+          "systemMessage": "You are the Meta-Learning Process Mining Specialist. Extract systemic patterns and recommend intake improvements."
+        }
+      },
+      "id": "node-ai-meta-learning",
+      "name": "Step 8b: AI Process Mining Optimizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [460, 720]
+    }
+  ],
+  "connections": {
+    "Step 1: Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Step 2: AI Evidence Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 2: AI Evidence Planner": {
+      "main": [
+        [
+          {
+            "node": "Step 3 & 4: Gap Auditor & Gatekeeper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3 & 4: Gap Auditor & Gatekeeper": {
+      "main": [
+        [
+          {
+            "node": "Decision Gate: Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision Gate: Complete?": {
+      "main": [
+        [
+          {
+            "node": "Step 7: AI Deliberator & Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Step 5: Autonomous Retriever Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 5: Autonomous Retriever Loop": {
+      "main": [
+        [
+          {
+            "node": "All Healed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All Healed?": {
+      "main": [
+        [
+          {
+            "node": "Step 7: AI Deliberator & Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Step 6: Precision HITL Micro-Ask",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 6: Precision HITL Micro-Ask": {
+      "main": [
+        [
+          {
+            "node": "Step 7: AI Deliberator & Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 7: AI Deliberator & Verdict": {
+      "main": [
+        [
+          {
+            "node": "Step 7b: Execute Actions (ERP/PO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 8: Weekly Process Optimizer Trigger": {
+      "main": [
+        [
+          {
+            "node": "Step 8b: AI Process Mining Optimizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
