@@ -10,6 +10,16 @@ TEMPLATE_PATH = r"C:\Users\HP\.gemini\antigravity\brain\3fe956f8-3f9d-4415-84ed-
 OUTPUT_PATH = r"c:\Users\HP\Downloads\The Decision Completeness Engine\HackSprint_Decision_Completeness_Engine.pptx"
 STATIC_PATH = r"c:\Users\HP\Downloads\The Decision Completeness Engine\static\HackSprint_Decision_Completeness_Engine.pptx"
 
+LIVE_URL = "https://static-outstanding-palm-clarke.trycloudflare.com"
+if os.path.exists("LIVE_URL.txt"):
+    try:
+        with open("LIVE_URL.txt", "r", encoding="utf-8") as f:
+            url_read = f.read().strip()
+            if url_read.startswith("http"):
+                LIVE_URL = url_read
+    except Exception:
+        pass
+
 prs = pptx.Presentation(TEMPLATE_PATH)
 
 # Palette
@@ -83,7 +93,7 @@ items_s1 = [
     ("TEAM NAME: ", "Hackhustlers", COLOR_INDIGO_ACCENT, True),
     ("TRACK: ", "Track 01: AI & Enterprise Automation (Open Innovation)", COLOR_DARK_SLATE, True),
     ("PROJECT: ", "The Decision Completeness Engine (DCE)", COLOR_TEAL_ACCENT, True),
-    ("LIVE DEMO: ", "https://static-outstanding-palm-clarke.trycloudflare.com", COLOR_DARK_SLATE, False),
+    ("LIVE DEMO: ", LIVE_URL, COLOR_DARK_SLATE, False),
 ]
 
 for idx, (label, val, val_col, is_bold) in enumerate(items_s1):
@@ -675,7 +685,7 @@ r_l1.font.bold = True
 r_l1.font.color.rgb = COLOR_INDIGO_ACCENT
 
 r_l2 = p_link.add_run()
-r_l2.text = "https://static-outstanding-palm-clarke.trycloudflare.com  [⚡ Fast <50ms | 8 Domains | Zero Hallucination]"
+r_l2.text = f"{LIVE_URL}  [⚡ Fast <50ms | 8 Domains | Zero Hallucination]"
 r_l2.font.name = FONT_SANS
 r_l2.font.size = Pt(14)
 r_l2.font.bold = True
@@ -690,7 +700,7 @@ tf_tb = topbar.text_frame
 tf_tb.vertical_anchor = MSO_ANCHOR.MIDDLE
 tf_tb.margin_left = Inches(0.4)
 p = tf_tb.paragraphs[0]
-p.text = "🔴 🟡 🟢   https://static-outstanding-palm-clarke.trycloudflare.com  —  Decision Completeness Engine Visual Studio"
+p.text = f"🔴 🟡 🟢   {LIVE_URL}  —  Decision Completeness Engine Visual Studio"
 p.font.name = FONT_SANS
 p.font.size = Pt(12)
 p.font.color.rgb = RGBColor(226, 232, 240)
