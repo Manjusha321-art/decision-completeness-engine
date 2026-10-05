@@ -106,11 +106,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchScenarios() {
     try {
       const res = await fetch('/api/scenarios');
+      if (!res.ok) throw new Error('API unavailable');
       const data = await res.json();
       Object.assign(scenariosCache, data.scenarios);
       renderScenarioButtons(data.scenarios, data.current);
     } catch (err) {
-      console.error('Failed to load scenarios', err);
+      console.warn('API offline. Using embedded dataset for static 24/7 hosting:', err);
+      if (window.DCE_STATIC_DATA && window.DCE_STATIC_DATA.scenarios) {
+        Object.assign(scenariosCache, window.DCE_STATIC_DATA.scenarios);
+        renderScenarioButtons(window.DCE_STATIC_DATA.scenarios, currentScenarioId);
+      }
     }
   }
 
@@ -225,15 +230,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const t0 = performance.now();
 
     try {
-      // 1. Single rapid backend execution
-      const res = await fetch('/api/pipeline/run-full', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auto_resolve_hitl: autoHitl })
-      });
-      const trace = await res.json();
-      const elapsed = Math.round(performance.now() - t0);
+      let trace;
+      try {
+        const res = await fetch('/api/pipeline/run-full', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auto_resolve_hitl: autoHitl })
+        });
+        if (!res.ok) throw new Error('API unavailable');
+        trace = await res.json();
+      } catch (apiErr) {
+        console.warn('API unavailable. Running client-side simulation:', apiErr);
+        if (window.DCE_STATIC_DATA && window.DCE_STATIC_DATA.scenarios[currentScenarioId]) {
+          const scenData = window.DCE_STATIC_DATA.scenarios[currentScenarioId];
+          trace = autoHitl ? scenData.trace_auto : scenData.trace_normal;
+        } else {
+          throw apiErr;
+        }
+      }
 
+      const elapsed = Math.round(performance.now() - t0);
       const delayStep = (speedMode === 'turbo') ? 0 : (speedMode === 'fast' ? 50 : 250);
 
       // Execute visual progression
@@ -508,16 +524,32 @@ document.addEventListener('DOMContentLoaded', () => {
     pipelineStatusText.textContent = `⚡ Resolving human authorization (${action})...`;
 
     try {
-      const res = await fetch('/api/hitl/respond', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: action,
-          reviewer_name: hitlTargetRole.textContent,
-          notes: notes
-        })
-      });
-      const data = await res.json();
+      let data;
+      try {
+        const res = await fetch('/api/hitl/respond', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: action,
+            reviewer_name: hitlTargetRole.textContent,
+            notes: notes
+          })
+        });
+        if (!res.ok) throw new Error('API offline');
+        data = await res.json();
+      } catch (apiErr) {
+        console.warn('API offline. Resolving HITL client-side:', apiErr);
+        if (window.DCE_STATIC_DATA && window.DCE_STATIC_DATA.scenarios[currentScenarioId]) {
+          const scenData = window.DCE_STATIC_DATA.scenarios[currentScenarioId];
+          data = {
+            status: 'RESOLVED',
+            decision: scenData.trace_auto.steps.step7_verdict.decision,
+            final_audit: scenData.trace_auto.steps.post_heal_audit
+          };
+        } else {
+          throw apiErr;
+        }
+      }
       
       // Update UI in single pass
       hitlTabBadge.classList.add('hidden');
@@ -564,8 +596,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchAnalytics() {
     try {
-      const res = await fetch('/api/analytics');
-      const data = await res.json();
+      let data;
+      try {
+        const res = await fetch('/api/analytics');
+        if (!res.ok) throw new Error('API offline');
+        data = await res.json();
+      } catch (apiErr) {
+        if (window.DCE_STATIC_DATA && window.DCE_STATIC_DATA.analytics) {
+          data = window.DCE_STATIC_DATA.analytics;
+        } else {
+          throw apiErr;
+        }
+      }
       const m = data.metrics;
 
       document.getElementById('metric-total-runs').textContent = m.total_decisions_processed || 0;
